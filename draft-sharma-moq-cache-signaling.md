@@ -51,9 +51,8 @@ informative:
 This document defines optional hop-by-hop cache signaling for Media over
 QUIC Transport (MOQT). It allows an endpoint to query whether a finite
 range of a Track is available in the local cache of its peer. It also
-allows a subscriber to request a summary of how a FETCH response was
-served, including whether Objects came from the responding endpoint's
-local cache, an upstream publisher, or the Original Publisher.
+allows a subscriber to learn whether a FETCH response was a cache hit or
+cache miss at the responding endpoint.
 
 Cache signaling is advisory, represents only the responding endpoint,
 and does not reserve cached Objects or change the processing of a
@@ -256,8 +255,8 @@ as a PROTOCOL_VIOLATION.
 
 # Fetch Cache Status {#fetch-cache-status}
 
-Fetch Cache Status describes how a completed FETCH response was sourced by the
-responding Publisher.
+Fetch Cache Status reports whether a completed FETCH response was a cache hit
+or cache miss at the responding Publisher.
 
 It does not change the requested range, Group Order, FILL_TIMEOUT, Object
 payload, or any other FETCH behavior.
@@ -268,17 +267,8 @@ FETCH_CACHE_STATUS_REQUEST is a length-prefixed Message Parameter with
 Parameter Type TBD4. It MAY appear exactly once in FETCH and MUST NOT appear in
 any other message.
 
-Its value is:
-
-~~~
-FETCH_CACHE_STATUS_REQUEST Value {
-  Maximum Source Ranges (vi64),
-}
-~~~
-
-Maximum Source Ranges is the largest number of Fetch Source Range entries the
-subscriber is willing to receive. A value of zero requests only the aggregate
-Source Flags.
+The value of FETCH_CACHE_STATUS_REQUEST MUST be empty. The presence of the
+parameter requests a fetch-level cache status in FETCH_OK.
 
 ## FETCH_CACHE_STATUS Parameter {#fetch-status-response}
 
@@ -291,78 +281,41 @@ TBD5. Its value is:
 
 ~~~
 FETCH_CACHE_STATUS Value {
-  Source Flags (vi64),
-  Range List Complete (8),
-  Number of Source Ranges (vi64),
-  Fetch Source Range (..) ...,
-}
-
-Fetch Source Range {
-  Source (vi64),
-  Group ID (vi64),
-  First Object ID (vi64),
-  Last Object ID (vi64),
+  Cache Status (8),
 }
 ~~~
 
-Source Flags is a bit mask summarizing the complete FETCH response:
-
-| Bit | Name | Meaning |
-|---:|:-----|:--------|
-| 0x01 | LOCAL_CACHE_USED | At least one Normal Object was served from the responding endpoint's Local Cache. |
-| 0x02 | UPSTREAM_USED | At least one Normal Object was obtained from an upstream MOQT endpoint after processing of the FETCH began. |
-| 0x04 | ORIGINAL_PUBLISHER_USED | At least one Normal Object was supplied directly by the responding Original Publisher. |
-| 0x08 | UNKNOWN_RANGE_PRESENT | The FETCH response contains a range whose Object status is unknown. |
-| 0x10 | NONEXISTENT_RANGE_PRESENT | The FETCH response identifies one or more Objects as not existing. |
-
-More than one bit can be set. A receiver MUST ignore unknown bits.
-
-For purposes of these flags, a complete Object available in the Local Cache
-when processing of the FETCH begins is classified as LOCAL_CACHE_USED. An
-Object that subsequently becomes available through an upstream subscription or
-fetch is classified as UPSTREAM_USED, even if the Relay temporarily stores it
-before forwarding it downstream.
-
-A Normal Object supplied by the responding Original Publisher is classified as
-ORIGINAL_PUBLISHER_USED. A Relay MUST NOT use that classification merely
-because it believes its upstream peer is the Original Publisher.
-
-Source has the following values:
+Cache Status has the following values:
 
 | Value | Name |
 |---:|:-----|
-| 0x00 | LOCAL_CACHE |
-| 0x01 | UPSTREAM |
-| 0x02 | ORIGINAL_PUBLISHER |
+| 0x00 | MISS |
+| 0x01 | HIT |
 
-Each Fetch Source Range identifies consecutive Normal Objects from one Group
-that were serialized into the FETCH response using the specified source. Last
-Object ID MUST be greater than or equal to First Object ID.
+HIT means that the FETCH was satisfied entirely using the responding
+Publisher's local state. At least one Normal Object MUST have been serialized
+in the response, every Normal Object serialized MUST have been complete in the
+Local Cache when processing of the FETCH began, the response MUST NOT contain
+an Unknown range, and the Publisher MUST NOT have initiated or waited for an
+upstream MOQT operation to determine any part of the response. Authoritatively
+known non-existent Objects do not prevent a response from being a HIT.
 
-Entries MUST be ordered by increasing Group ID and Object ID, regardless of the
-Group Order used for delivery. Entries MUST NOT overlap, and adjacent entries
-from the same Group with the same Source MUST be combined.
+MISS means that the response does not meet every requirement for HIT. In
+particular, a mixed response containing both locally cached and upstream
+Objects is a MISS, as is a response containing no Normal Objects. Cache Status
+does not identify which Objects caused the miss or where they were obtained.
 
-Range List Complete is 1 if every Normal Object serialized into the FETCH
-response is represented by exactly one Fetch Source Range. Otherwise, it is 0.
-A Publisher MUST NOT include more entries than Maximum Source Ranges. It MAY
-include fewer entries because of local limits or the maximum MOQT
-control-message size, but MUST then set Range List Complete to 0.
-
-Source Flags always describe the complete FETCH response, even when the range
-list is incomplete.
+A recipient MUST treat any other Cache Status value as a
+PROTOCOL_VIOLATION.
 
 Because FETCH_CACHE_STATUS describes the completed response, the Publisher
-MUST NOT send FETCH_OK until it can determine the final Source Flags. This can
+MUST NOT send FETCH_OK until it can determine the final Cache Status. This can
 delay FETCH_OK. As permitted by {{MOQT}}, the Publisher MAY begin transmitting
 Objects on the FETCH data stream before sending FETCH_OK.
 
 If the FETCH is rejected or ultimately fails with REQUEST_ERROR, no
 FETCH_CACHE_STATUS is returned. Existing MOQT errors and stream-reset codes
 communicate that failure.
-
-A recipient MUST treat malformed, overlapping, duplicated, or out-of-range
-Fetch Source Ranges as a PROTOCOL_VIOLATION.
 
 
 # Relay Processing {#relay-processing}
@@ -376,9 +329,10 @@ the extension is negotiated on that Session. Such an upstream response does
 not determine the Relay's downstream response:
 
 * Cache Availability always describes the Relay's own Local Cache.
-* Fetch Cache Status describes how that Relay served the downstream FETCH.
-* Content obtained from any upstream peer is reported as UPSTREAM, regardless
-  of whether that peer served it from its own cache.
+* Fetch Cache Status describes whether that Relay's downstream FETCH response
+  was a complete local cache hit. Content obtained from any upstream peer makes
+  the response a MISS, regardless of whether that peer served it from its own
+  cache.
 
 Cache information is advisory. A subscriber MUST NOT use it to infer that an
 Object exists, to override an authoritative indication that an Object does not
@@ -398,7 +352,8 @@ available Objects. Cache Availability allows a subscriber to ask for a cache
 snapshot without fetching Object payloads.
 
 FILL_TIMEOUT continues to control how long a Relay waits for unavailable
-Objects. Fetch Cache Status only reports the resulting behavior.
+Objects. Fetch Cache Status only reports whether the resulting response was a
+cache hit or miss.
 
 ## Cache Distance
 
@@ -408,9 +363,8 @@ Objects.
 
 CACHE_DISTANCE and Fetch Cache Status provide related but distinct
 information. CACHE_DISTANCE supplies fine-grained, composable, multi-hop
-attribution on the FETCH data stream. Fetch Cache Status provides an explicitly
-requested summary of the behavior of the immediate peer and can report that
-Unknown ranges occurred.
+attribution on the FETCH data stream. Fetch Cache Status provides only an
+explicitly requested, fetch-level hit or miss result for the immediate peer.
 
 If both extensions are used, an inconsistency between their values is not
 itself a MOQT protocol violation. Cache state can change while a request is
