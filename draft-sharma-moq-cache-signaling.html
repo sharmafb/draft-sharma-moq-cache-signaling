@@ -10,9 +10,8 @@
        This document defines optional hop-by-hop cache signaling for Media over
 QUIC Transport (MOQT). It allows an endpoint to query whether a finite
 range of a Track is available in the local cache of its peer. It also
-allows a subscriber to request a summary of how a FETCH response was
-served, including whether Objects came from the responding endpoint's
-local cache, an upstream publisher, or the Original Publisher. 
+allows a subscriber to learn whether a FETCH response was a cache hit or
+cache miss at the responding endpoint. 
        Cache signaling is advisory, represents only the responding endpoint,
 and does not reserve cached Objects or change the processing of a
 SUBSCRIBE or FETCH. 
@@ -1089,9 +1088,8 @@ svg {
 <p id="section-abstract-1">This document defines optional hop-by-hop cache signaling for Media over
 QUIC Transport (MOQT). It allows an endpoint to query whether a finite
 range of a Track is available in the local cache of its peer. It also
-allows a subscriber to request a summary of how a FETCH response was
-served, including whether Objects came from the responding endpoint's
-local cache, an upstream publisher, or the Original Publisher.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
+allows a subscriber to learn whether a FETCH response was a cache hit or
+cache miss at the responding endpoint.<a href="#section-abstract-1" class="pilcrow">¶</a></p>
 <p id="section-abstract-2">Cache signaling is advisory, represents only the responding endpoint,
 and does not reserve cached Objects or change the processing of a
 SUBSCRIBE or FETCH.<a href="#section-abstract-2" class="pilcrow">¶</a></p>
@@ -1510,8 +1508,8 @@ as a PROTOCOL_VIOLATION.<a href="#section-4.2-12" class="pilcrow">¶</a></p>
       <h2 id="name-fetch-cache-status">
 <a href="#section-5" class="section-number selfRef">5. </a><a href="#name-fetch-cache-status" class="section-name selfRef">Fetch Cache Status</a>
       </h2>
-<p id="section-5-1">Fetch Cache Status describes how a completed FETCH response was sourced by the
-responding Publisher.<a href="#section-5-1" class="pilcrow">¶</a></p>
+<p id="section-5-1">Fetch Cache Status reports whether a completed FETCH response was a cache hit
+or cache miss at the responding Publisher.<a href="#section-5-1" class="pilcrow">¶</a></p>
 <p id="section-5-2">It does not change the requested range, Group Order, FILL_TIMEOUT, Object
 payload, or any other FETCH behavior.<a href="#section-5-2" class="pilcrow">¶</a></p>
 <div id="fetch-status-request">
@@ -1522,17 +1520,8 @@ payload, or any other FETCH behavior.<a href="#section-5-2" class="pilcrow">¶</
 <p id="section-5.1-1">FETCH_CACHE_STATUS_REQUEST is a length-prefixed Message Parameter with
 Parameter Type TBD4. It <span class="bcp14">MAY</span> appear exactly once in FETCH and <span class="bcp14">MUST NOT</span> appear in
 any other message.<a href="#section-5.1-1" class="pilcrow">¶</a></p>
-<p id="section-5.1-2">Its value is:<a href="#section-5.1-2" class="pilcrow">¶</a></p>
-<div class="alignLeft art-text artwork" id="section-5.1-3">
-<pre>
-FETCH_CACHE_STATUS_REQUEST Value {
-  Maximum Source Ranges (vi64),
-}
-</pre><a href="#section-5.1-3" class="pilcrow">¶</a>
-</div>
-<p id="section-5.1-4">Maximum Source Ranges is the largest number of Fetch Source Range entries the
-subscriber is willing to receive. A value of zero requests only the aggregate
-Source Flags.<a href="#section-5.1-4" class="pilcrow">¶</a></p>
+<p id="section-5.1-2">The value of FETCH_CACHE_STATUS_REQUEST <span class="bcp14">MUST</span> be empty. The presence of the
+parameter requests a fetch-level cache status in FETCH_OK.<a href="#section-5.1-2" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="fetch-status-response">
@@ -1548,70 +1537,13 @@ TBD5. Its value is:<a href="#section-5.2-2" class="pilcrow">¶</a></p>
 <div class="alignLeft art-text artwork" id="section-5.2-3">
 <pre>
 FETCH_CACHE_STATUS Value {
-  Source Flags (vi64),
-  Range List Complete (8),
-  Number of Source Ranges (vi64),
-  Fetch Source Range (..) ...,
-}
-
-Fetch Source Range {
-  Source (vi64),
-  Group ID (vi64),
-  First Object ID (vi64),
-  Last Object ID (vi64),
+  Cache Status (8),
 }
 </pre><a href="#section-5.2-3" class="pilcrow">¶</a>
 </div>
-<p id="section-5.2-4">Source Flags is a bit mask summarizing the complete FETCH response:<a href="#section-5.2-4" class="pilcrow">¶</a></p>
+<p id="section-5.2-4">Cache Status has the following values:<a href="#section-5.2-4" class="pilcrow">¶</a></p>
 <table class="center" id="table-3">
           <caption><a href="#table-3" class="selfRef">Table 3</a></caption>
-<thead>
-            <tr>
-              <th class="text-right" rowspan="1" colspan="1">Bit</th>
-              <th class="text-left" rowspan="1" colspan="1">Name</th>
-              <th class="text-left" rowspan="1" colspan="1">Meaning</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="text-right" rowspan="1" colspan="1">0x01</td>
-              <td class="text-left" rowspan="1" colspan="1">LOCAL_CACHE_USED</td>
-              <td class="text-left" rowspan="1" colspan="1">At least one Normal Object was served from the responding endpoint's Local Cache.</td>
-            </tr>
-            <tr>
-              <td class="text-right" rowspan="1" colspan="1">0x02</td>
-              <td class="text-left" rowspan="1" colspan="1">UPSTREAM_USED</td>
-              <td class="text-left" rowspan="1" colspan="1">At least one Normal Object was obtained from an upstream MOQT endpoint after processing of the FETCH began.</td>
-            </tr>
-            <tr>
-              <td class="text-right" rowspan="1" colspan="1">0x04</td>
-              <td class="text-left" rowspan="1" colspan="1">ORIGINAL_PUBLISHER_USED</td>
-              <td class="text-left" rowspan="1" colspan="1">At least one Normal Object was supplied directly by the responding Original Publisher.</td>
-            </tr>
-            <tr>
-              <td class="text-right" rowspan="1" colspan="1">0x08</td>
-              <td class="text-left" rowspan="1" colspan="1">UNKNOWN_RANGE_PRESENT</td>
-              <td class="text-left" rowspan="1" colspan="1">The FETCH response contains a range whose Object status is unknown.</td>
-            </tr>
-            <tr>
-              <td class="text-right" rowspan="1" colspan="1">0x10</td>
-              <td class="text-left" rowspan="1" colspan="1">NONEXISTENT_RANGE_PRESENT</td>
-              <td class="text-left" rowspan="1" colspan="1">The FETCH response identifies one or more Objects as not existing.</td>
-            </tr>
-          </tbody>
-        </table>
-<p id="section-5.2-6">More than one bit can be set. A receiver <span class="bcp14">MUST</span> ignore unknown bits.<a href="#section-5.2-6" class="pilcrow">¶</a></p>
-<p id="section-5.2-7">For purposes of these flags, a complete Object available in the Local Cache
-when processing of the FETCH begins is classified as LOCAL_CACHE_USED. An
-Object that subsequently becomes available through an upstream subscription or
-fetch is classified as UPSTREAM_USED, even if the Relay temporarily stores it
-before forwarding it downstream.<a href="#section-5.2-7" class="pilcrow">¶</a></p>
-<p id="section-5.2-8">A Normal Object supplied by the responding Original Publisher is classified as
-ORIGINAL_PUBLISHER_USED. A Relay <span class="bcp14">MUST NOT</span> use that classification merely
-because it believes its upstream peer is the Original Publisher.<a href="#section-5.2-8" class="pilcrow">¶</a></p>
-<p id="section-5.2-9">Source has the following values:<a href="#section-5.2-9" class="pilcrow">¶</a></p>
-<table class="center" id="table-4">
-          <caption><a href="#table-4" class="selfRef">Table 4</a></caption>
 <thead>
             <tr>
               <th class="text-right" rowspan="1" colspan="1">Value</th>
@@ -1621,40 +1553,34 @@ because it believes its upstream peer is the Original Publisher.<a href="#sectio
           <tbody>
             <tr>
               <td class="text-right" rowspan="1" colspan="1">0x00</td>
-              <td class="text-left" rowspan="1" colspan="1">LOCAL_CACHE</td>
+              <td class="text-left" rowspan="1" colspan="1">MISS</td>
             </tr>
             <tr>
               <td class="text-right" rowspan="1" colspan="1">0x01</td>
-              <td class="text-left" rowspan="1" colspan="1">UPSTREAM</td>
-            </tr>
-            <tr>
-              <td class="text-right" rowspan="1" colspan="1">0x02</td>
-              <td class="text-left" rowspan="1" colspan="1">ORIGINAL_PUBLISHER</td>
+              <td class="text-left" rowspan="1" colspan="1">HIT</td>
             </tr>
           </tbody>
         </table>
-<p id="section-5.2-11">Each Fetch Source Range identifies consecutive Normal Objects from one Group
-that were serialized into the FETCH response using the specified source. Last
-Object ID <span class="bcp14">MUST</span> be greater than or equal to First Object ID.<a href="#section-5.2-11" class="pilcrow">¶</a></p>
-<p id="section-5.2-12">Entries <span class="bcp14">MUST</span> be ordered by increasing Group ID and Object ID, regardless of the
-Group Order used for delivery. Entries <span class="bcp14">MUST NOT</span> overlap, and adjacent entries
-from the same Group with the same Source <span class="bcp14">MUST</span> be combined.<a href="#section-5.2-12" class="pilcrow">¶</a></p>
-<p id="section-5.2-13">Range List Complete is 1 if every Normal Object serialized into the FETCH
-response is represented by exactly one Fetch Source Range. Otherwise, it is 0.
-A Publisher <span class="bcp14">MUST NOT</span> include more entries than Maximum Source Ranges. It <span class="bcp14">MAY</span>
-include fewer entries because of local limits or the maximum MOQT
-control-message size, but <span class="bcp14">MUST</span> then set Range List Complete to 0.<a href="#section-5.2-13" class="pilcrow">¶</a></p>
-<p id="section-5.2-14">Source Flags always describe the complete FETCH response, even when the range
-list is incomplete.<a href="#section-5.2-14" class="pilcrow">¶</a></p>
-<p id="section-5.2-15">Because FETCH_CACHE_STATUS describes the completed response, the Publisher
-<span class="bcp14">MUST NOT</span> send FETCH_OK until it can determine the final Source Flags. This can
+<p id="section-5.2-6">HIT means that the FETCH was satisfied entirely using the responding
+Publisher's local state. At least one Normal Object <span class="bcp14">MUST</span> have been serialized
+in the response, every Normal Object serialized <span class="bcp14">MUST</span> have been complete in the
+Local Cache when processing of the FETCH began, the response <span class="bcp14">MUST NOT</span> contain
+an Unknown range, and the Publisher <span class="bcp14">MUST NOT</span> have initiated or waited for an
+upstream MOQT operation to determine any part of the response. Authoritatively
+known non-existent Objects do not prevent a response from being a HIT.<a href="#section-5.2-6" class="pilcrow">¶</a></p>
+<p id="section-5.2-7">MISS means that the response does not meet every requirement for HIT. In
+particular, a mixed response containing both locally cached and upstream
+Objects is a MISS, as is a response containing no Normal Objects. Cache Status
+does not identify which Objects caused the miss or where they were obtained.<a href="#section-5.2-7" class="pilcrow">¶</a></p>
+<p id="section-5.2-8">A recipient <span class="bcp14">MUST</span> treat any other Cache Status value as a
+PROTOCOL_VIOLATION.<a href="#section-5.2-8" class="pilcrow">¶</a></p>
+<p id="section-5.2-9">Because FETCH_CACHE_STATUS describes the completed response, the Publisher
+<span class="bcp14">MUST NOT</span> send FETCH_OK until it can determine the final Cache Status. This can
 delay FETCH_OK. As permitted by <span>[<a href="#MOQT" class="cite xref">MOQT</a>]</span>, the Publisher <span class="bcp14">MAY</span> begin transmitting
-Objects on the FETCH data stream before sending FETCH_OK.<a href="#section-5.2-15" class="pilcrow">¶</a></p>
-<p id="section-5.2-16">If the FETCH is rejected or ultimately fails with REQUEST_ERROR, no
+Objects on the FETCH data stream before sending FETCH_OK.<a href="#section-5.2-9" class="pilcrow">¶</a></p>
+<p id="section-5.2-10">If the FETCH is rejected or ultimately fails with REQUEST_ERROR, no
 FETCH_CACHE_STATUS is returned. Existing MOQT errors and stream-reset codes
-communicate that failure.<a href="#section-5.2-16" class="pilcrow">¶</a></p>
-<p id="section-5.2-17">A recipient <span class="bcp14">MUST</span> treat malformed, overlapping, duplicated, or out-of-range
-Fetch Source Ranges as a PROTOCOL_VIOLATION.<a href="#section-5.2-17" class="pilcrow">¶</a></p>
+communicate that failure.<a href="#section-5.2-10" class="pilcrow">¶</a></p>
 </section>
 </div>
 </section>
@@ -1675,11 +1601,10 @@ not determine the Relay's downstream response:<a href="#section-6-2" class="pilc
           <p id="section-6-3.1.1">Cache Availability always describes the Relay's own Local Cache.<a href="#section-6-3.1.1" class="pilcrow">¶</a></p>
 </li>
         <li class="normal" id="section-6-3.2">
-          <p id="section-6-3.2.1">Fetch Cache Status describes how that Relay served the downstream FETCH.<a href="#section-6-3.2.1" class="pilcrow">¶</a></p>
-</li>
-        <li class="normal" id="section-6-3.3">
-          <p id="section-6-3.3.1">Content obtained from any upstream peer is reported as UPSTREAM, regardless
-of whether that peer served it from its own cache.<a href="#section-6-3.3.1" class="pilcrow">¶</a></p>
+          <p id="section-6-3.2.1">Fetch Cache Status describes whether that Relay's downstream FETCH response
+was a complete local cache hit. Content obtained from any upstream peer makes
+the response a MISS, regardless of whether that peer served it from its own
+cache.<a href="#section-6-3.2.1" class="pilcrow">¶</a></p>
 </li>
       </ul>
 <p id="section-6-4">Cache information is advisory. A subscriber <span class="bcp14">MUST NOT</span> use it to infer that an
@@ -1704,7 +1629,8 @@ Unknown ranges, as specified by <span>[<a href="#MOQT" class="cite xref">MOQT</a
 available Objects. Cache Availability allows a subscriber to ask for a cache
 snapshot without fetching Object payloads.<a href="#section-7.1-2" class="pilcrow">¶</a></p>
 <p id="section-7.1-3">FILL_TIMEOUT continues to control how long a Relay waits for unavailable
-Objects. Fetch Cache Status only reports the resulting behavior.<a href="#section-7.1-3" class="pilcrow">¶</a></p>
+Objects. Fetch Cache Status only reports whether the resulting response was a
+cache hit or miss.<a href="#section-7.1-3" class="pilcrow">¶</a></p>
 </section>
 </div>
 <div id="cache-distance">
@@ -1717,9 +1643,8 @@ portion of a FETCH response, the number of hops to the cache that supplied the
 Objects.<a href="#section-7.2-1" class="pilcrow">¶</a></p>
 <p id="section-7.2-2">CACHE_DISTANCE and Fetch Cache Status provide related but distinct
 information. CACHE_DISTANCE supplies fine-grained, composable, multi-hop
-attribution on the FETCH data stream. Fetch Cache Status provides an explicitly
-requested summary of the behavior of the immediate peer and can report that
-Unknown ranges occurred.<a href="#section-7.2-2" class="pilcrow">¶</a></p>
+attribution on the FETCH data stream. Fetch Cache Status provides only an
+explicitly requested, fetch-level hit or miss result for the immediate peer.<a href="#section-7.2-2" class="pilcrow">¶</a></p>
 <p id="section-7.2-3">If both extensions are used, an inconsistency between their values is not
 itself a MOQT protocol violation. Cache state can change while a request is
 processed, and both signals are supplied by peers rather than authenticated by
@@ -1792,8 +1717,8 @@ observations, so the 0-RTT precautions in <span>[<a href="#MOQT" class="cite xre
       </h2>
 <p id="section-10-1">This document requests registration of the following Setup Option in the
 "MOQT Setup Options" registry:<a href="#section-10-1" class="pilcrow">¶</a></p>
-<table class="center" id="table-5">
-        <caption><a href="#table-5" class="selfRef">Table 5</a></caption>
+<table class="center" id="table-4">
+        <caption><a href="#table-4" class="selfRef">Table 4</a></caption>
 <thead>
           <tr>
             <th class="text-right" rowspan="1" colspan="1">Type</th>
@@ -1814,8 +1739,8 @@ observations, so the 0-RTT precautions in <span>[<a href="#MOQT" class="cite xre
 variable-length integer.<a href="#section-10-3" class="pilcrow">¶</a></p>
 <p id="section-10-4">This document requests registration of the following Message Parameters in the
 "MOQT Message Parameters" registry:<a href="#section-10-4" class="pilcrow">¶</a></p>
-<table class="center" id="table-6">
-        <caption><a href="#table-6" class="selfRef">Table 6</a></caption>
+<table class="center" id="table-5">
+        <caption><a href="#table-5" class="selfRef">Table 5</a></caption>
 <thead>
           <tr>
             <th class="text-right" rowspan="1" colspan="1">Type</th>
